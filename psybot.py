@@ -1,116 +1,32 @@
 import os
-from flask import Flask, request, jsonify, render_template_string
+import asyncio
 from google import genai
 from google.genai import types
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 
-app = Flask(__name__)
+# API Keys from Environment Variables
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-# Initialize the Gemini API client
-# GEMINI_API_KEY must be set in Render's Environment Variables
-api_key = os.environ.get("GEMINI_API_KEY")
-client = genai.Client(api_key=api_key) if api_key else None
+# Gemini Client Setup
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-# System prompt for PsyBot's personality and role
 SYSTEM_INSTRUCTION = (
     "You are PsyBot, an empathetic, supportive, and knowledgeable psychology assistant. "
     "Provide clear, grounded, and insightful responses with care and professionalism. "
     "If a user mentions severe distress or self-harm, gently urge them to seek professional help."
 )
 
-# HTML Chat Interface
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PsyBot</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        body { background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 15px; }
-        .chat-card { width: 100%; max-width: 600px; height: 80vh; background: #ffffff; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); display: flex; flex-direction: column; overflow: hidden; }
-        .chat-header { background: #4f46e5; color: white; padding: 18px 24px; font-weight: 600; font-size: 1.2rem; }
-        .chat-box { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .msg { max-width: 80%; padding: 12px 16px; border-radius: 14px; font-size: 0.95rem; line-height: 1.5; word-wrap: break-word; }
-        .msg.bot { background: #f3f4f6; color: #1f2937; align-self: flex-start; border-bottom-left-radius: 4px; }
-        .msg.user { background: #4f46e5; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .chat-input-area { display: flex; padding: 16px; border-top: 1px solid #e5e7eb; gap: 10px; background: #fafafa; }
-        input[type="text"] { flex: 1; padding: 12px 16px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 0.95rem; }
-        input[type="text"]:focus { border-color: #4f46e5; }
-        button { background: #4f46e5; color: white; border: none; padding: 0 20px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
-        button:hover { background: #4338ca; }
-    </style>
-</head>
-<body>
-    <div class="chat-card">
-        <div class="chat-header">PsyBot AI</div>
-        <div class="chat-box" id="chatBox">
-            <div class="msg bot">Hello! I am PsyBot. How can I support you today?</div>
-        </div>
-        <form class="chat-input-area" id="chatForm">
-            <input type="text" id="userInput" placeholder="Type your message..." autocomplete="off" required />
-            <button type="submit">Send</button>
-        </form>
-    </div>
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    welcome_text = "Hello! Main PsyBot hoon. Aapki mental health aur emotional well-being se judi baaton me help karne ke liye taiyaar hoon. Aap kaise hain aaj?"
+    await update.message.reply_text(welcome_text)
 
-    <script>
-        const chatForm = document.getElementById('chatForm');
-        const userInput = document.getElementById('userInput');
-        const chatBox = document.getElementById('chatBox');
-
-        function appendMessage(text, sender) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `msg ${sender}`;
-            msgDiv.innerText = text;
-            chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const message = userInput.value.trim();
-            if (!message) return;
-
-            appendMessage(message, 'user');
-            userInput.value = '';
-
-            try {
-                const res = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message })
-                });
-                const data = await res.json();
-                if (data.reply) {
-                    appendMessage(data.reply, 'bot');
-                } else {
-                    appendMessage('Error: ' + (data.error || 'Unable to get response'), 'bot');
-                }
-            } catch (err) {
-                appendMessage('Server connection error.', 'bot');
-            }
-        });
-    </script>
-</body>
-</html>
-"""
-
-@app.route("/", methods=["GET"])
-def home():
-    """Renders the web chat interface."""
-    return render_template_string(HTML_TEMPLATE)
-
-@app.route("/chat", methods=["POST"])
-def chat():
-    """Endpoint to process chat messages via Gemini."""
-    if not client:
-        return jsonify({"error": "GEMINI_API_KEY environment variable is not configured."}), 500
-
-    data = request.get_json() or {}
-    user_message = data.get("message", "").strip()
-
-    if not user_message:
-        return jsonify({"error": "Message cannot be empty."}), 400
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_message = update.message.text
+    
+    # Typing status indicator
+    await update.message.chat.send_action(action="typing")
 
     try:
         response = client.models.generate_content(
@@ -121,10 +37,24 @@ def chat():
                 temperature=0.7,
             ),
         )
-        return jsonify({"reply": response.text})
+        reply_text = response.text if response.text else "Sorry, I couldn't process that."
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        reply_text = f"Error: {str(e)}"
+
+    await update.message.reply_text(reply_text)
+
+def main():
+    if not TELEGRAM_BOT_TOKEN or not GEMINI_API_KEY:
+        print("Error: TELEGRAM_BOT_TOKEN or GEMINI_API_KEY missing in environment variables.")
+        return
+
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("PsyBot Telegram Bot is starting...")
+    app.run_polling()
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    main()
