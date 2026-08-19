@@ -6,7 +6,7 @@ from google.genai import types
 app = Flask(__name__)
 
 # Initialize the Gemini API client
-# Ensure GEMINI_API_KEY is set in Render's Environment Variables
+# GEMINI_API_KEY must be set in Render's Environment Variables
 api_key = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key) if api_key else None
 
@@ -17,7 +17,7 @@ SYSTEM_INSTRUCTION = (
     "If a user mentions severe distress or self-harm, gently urge them to seek professional help."
 )
 
-# Simple HTML Chat Interface
+# HTML Chat Interface
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -97,12 +97,12 @@ HTML_TEMPLATE = """
 
 @app.route("/", methods=["GET"])
 def home():
-    """Renders the web chat UI."""
+    """Renders the web chat interface."""
     return render_template_string(HTML_TEMPLATE)
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """API endpoint to interact with Gemini."""
+    """Endpoint to process chat messages via Gemini."""
     if not client:
         return jsonify({"error": "GEMINI_API_KEY environment variable is not configured."}), 500
 
@@ -114,7 +114,7 @@ def chat():
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=user_message,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
