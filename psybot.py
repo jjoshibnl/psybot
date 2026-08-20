@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 
-# Validate API keys before running
+# Pre-execution validation
 if not TELEGRAM_BOT_TOKEN or not GEMINI_API_KEY:
     logger.error("Error: TELEGRAM_BOT_TOKEN or GEMINI_API_KEY missing in environment variables.")
     sys.exit(1)
@@ -29,57 +29,61 @@ except Exception as e:
     logger.error(f"Failed to initialize Gemini Client: {e}")
     sys.exit(1)
 
-# System instruction for PsyBot
+# Compact, direct system instruction for faster token processing
 SYSTEM_INSTRUCTION = (
-    "You are PsyBot, a warm, empathetic, and supportive psychology assistant. "
-    "Listen carefully, provide structured and thoughtful advice, and maintain a comforting tone. "
-    "If a user expresses severe crisis or self-harm, gently advise them to connect with real-world professional help."
+    "You are PsyBot, an empathetic, supportive, and knowledgeable psychology assistant. "
+    "Provide clear, grounded, and concise insights without unnecessary filler. "
+    "If a user expresses acute distress or self-harm, immediately and gently encourage professional help."
 )
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start command."""
     welcome_text = (
         "Namaste! 🙏 I am PsyBot, your psychology assistant.\n\n"
-        "Feel free to share what's on your mind, ask questions about psychology, "
-        "or talk through anything causing you stress."
+        "How can I help you today?"
     )
     await update.message.reply_text(welcome_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle incoming text messages from Telegram and generate Gemini response."""
+    """Asynchronously handle incoming messages for maximum speed."""
     user_text = update.message.text
     if not user_text:
         return
 
-    # Show typing status in Telegram
+    # Trigger Telegram typing indicator
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
-        response = client.models.generate_content(
+        # Non-blocking async API call
+        response = await client.aio.models.generate_content(
             model="gemini-3.6-flash",
             contents=user_text,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
                 temperature=0.7,
+                max_output_tokens=350,  # Limits token generation time
             ),
         )
         reply_text = response.text or "I could not generate a response. Please try again."
     except Exception as e:
         logger.error(f"Gemini API Error: {e}")
-        reply_text = "Sorry, I ran into an issue connecting to AI services. Please try again in a moment."
+        reply_text = "⚠️ Temporary connection issue with AI services. Please send your message again."
 
     await update.message.reply_text(reply_text)
 
 def main():
-    """Start the Telegram bot."""
-    logger.info("Starting PsyBot on Telegram...")
-    application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    """Start polling."""
+    logger.info("Starting optimized PsyBot on Telegram...")
+    application = (
+        ApplicationBuilder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .concurrent_updates(True)  # Process multiple users simultaneously
+        .build()
+    )
 
-    # Handlers
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Run polling
     application.run_polling()
 
 if __name__ == "__main__":
