@@ -54,7 +54,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
-        # Non-blocking async API call
+        # Non-blocking async API call using the correct model required by your key
         response = await client.aio.models.generate_content(
             model="gemini-3.6-flash",
             contents=user_text,
