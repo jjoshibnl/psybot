@@ -24,9 +24,13 @@ except ImportError as e:
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
 
-# Pre-execution validation
+# Detailed validation check
+if not TELEGRAM_BOT_TOKEN:
+    logger.error("FATAL ERROR: TELEGRAM_BOT_TOKEN is missing in environment variables.")
+if not GEMINI_API_KEY:
+    logger.error("FATAL ERROR: GEMINI_API_KEY is missing in environment variables.")
+
 if not TELEGRAM_BOT_TOKEN or not GEMINI_API_KEY:
-    logger.error("FATAL ERROR: TELEGRAM_BOT_TOKEN or GEMINI_API_KEY missing in environment variables.")
     sys.exit(1)
 
 # Initialize Gemini Client
@@ -59,7 +63,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         response = await client.aio.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-2.5-flash",
             contents=user_text,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
