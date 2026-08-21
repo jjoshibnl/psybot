@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 
-# Setup logging first so we catch everything
+# Setup logging
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
