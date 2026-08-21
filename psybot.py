@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import asyncio
 
 # Setup logging
 logging.basicConfig(
@@ -62,8 +63,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
 
     try:
-        response = await client.aio.models.generate_content(
-            model="gemini-2.5-flash",
+        # Run standard generation in a background thread to prevent blocking the async loop
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model="gemini-1.5-flash",
             contents=user_text,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
@@ -73,7 +76,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         reply_text = response.text or "I could not generate a response. Please try again."
     except Exception as e:
-        logger.error(f"Gemini API Error: {e}")
+        logger.error(f"Gemini API Error: {e}", exc_info=True)
         reply_text = "⚠️ Temporary connection issue with AI services. Please send your message again."
 
     await update.message.reply_text(reply_text)
